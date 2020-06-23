@@ -1,5 +1,5 @@
 /*
-
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,15 +17,19 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"os"
 
+	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
 	// +kubebuilder:scaffold:imports
+
+	"github.com/kubernetes-security/clusterip-webhook/pkg/validator"
 )
 
 var (
@@ -40,12 +44,13 @@ func init() {
 }
 
 func main() {
+	var allowedExternalIPs []string
 	var metricsAddr string
-	var enableLeaderElection bool
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+	var webhookPort int
+
+	flag.IntVar(&webhookPort, "webhook-port", 9443, "Webhook port number")
+	flag.StringVar(&metricsAddr, "metrics-addr", "0", "The address the metric endpoint binds to.")
+	flag.StringSliceVar(&allowedExternalIPs, "allowed-external-ips", []string{}, "List of CIDR ranges allowed as External IPs in the service spec.")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -53,20 +58,27 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
-		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "1231181f.validate-externalip.webhook.svc",
+		Port:               webhookPort,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
+	setupLog.Info("registering webhook...")
+	serviceValidator, err := validator.NewServiceValidator(allowedExternalIPs)
+	if err != nil {
+		setupLog.Error(err, "problem registering webhook")
+		os.Exit(1)
+	}
+
+	mgr.GetWebhookServer().Register("/validate-service", &webhook.Admission{Handler: serviceValidator})
+
 	// +kubebuilder:scaffold:builder
 
-	setupLog.Info("starting manager")
+	setupLog.Info("starting webhook...")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "problem starting webhook")
 		os.Exit(1)
 	}
 }
