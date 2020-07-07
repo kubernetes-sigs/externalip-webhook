@@ -1,0 +1,3 @@
+domain: validate-externalip.webhook.svc
+repo: github.com/kubernetes-security/clusterip-webhook
+version: "2"
