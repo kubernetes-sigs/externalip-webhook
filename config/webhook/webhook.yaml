@@ -30,7 +30,8 @@ spec:
           - /webhook
           # uncomment the following section to update the respective parameters.
           #args:
-          #- --allowed-external-ips=10.0.0.0/8,11.0.0.0/8
+          #- --allowed-cirds=10.0.0.0/8,11.0.0.0/8
+          #- --allowed-ips=10.0.0.0,11.0.0.0
           #- --webhook-port=9443
           #- --metrics-addr=127.0.0.1:8080
           image: webhook:latest

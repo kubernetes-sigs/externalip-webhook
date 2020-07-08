@@ -18,6 +18,7 @@ package validator
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 
@@ -40,8 +41,10 @@ var (
 // +kubebuilder:webhook:path=/validate-service,mutating=false,failurePolicy=Ignore,groups="core",resources=services,verbs=create;update,versions=v1,name=validate-externalip.webhook.svc
 
 type ServiceValidator struct {
-	allowedExternalIPNets []*net.IPNet
-	decoder               *admission.Decoder
+	allowedIPNets []*net.IPNet
+	allowedIPs    map[string]bool
+	decoder       *admission.Decoder
+
 }
 
 func init() {
@@ -50,17 +53,30 @@ func init() {
 }
 
 // NewServiceValidator validates the input list if any and returns ServiceValidator with list of valid external IPNets
-func NewServiceValidator(allowedExternalIPs []string) (*ServiceValidator, error) {
-	var externalIPNets []*net.IPNet
-	for _, externalIP := range allowedExternalIPs {
-		_, ipNet, err := net.ParseCIDR(externalIP)
+func NewServiceValidator(allowedExternalIPs, allowedCIDRs []string) (*ServiceValidator, error) {
+	var allowedIPNets []*net.IPNet
+	allowedIPs := make(map[string]bool)
+
+	for _, allowedCIDR := range allowedCIDRs {
+		_, ipNet, err := net.ParseCIDR(allowedCIDR)
 		if err != nil {
 			return nil, err
 		}
-		externalIPNets = append(externalIPNets, ipNet)
+		allowedIPNets = append(allowedIPNets, ipNet)
 	}
 
-	return &ServiceValidator{allowedExternalIPNets: externalIPNets}, nil
+	// validate externalIPs
+	for _, allowedExternalIP := range allowedExternalIPs {
+		ip := net.ParseIP(allowedExternalIP)
+		if ip == nil {
+			return nil, fmt.Errorf("externalIP %s is not valid", allowedExternalIP)
+		}
+		allowedIPs[allowedExternalIP] = true
+	}
+
+	return &ServiceValidator{
+		allowedIPNets: allowedIPNets,
+		allowedIPs:    allowedIPs}, nil
 }
 
 // Handle handles the /validate-service endpoint requests
@@ -85,14 +101,18 @@ func (sv *ServiceValidator) InjectDecoder(d *admission.Decoder) error {
 func (sv *ServiceValidator) validateExternalIPs(externalIPsInSpec []string) admission.Response {
 
 	for _, externalIP := range externalIPsInSpec {
-		var found bool
 		ip := net.ParseIP(externalIP)
 		if ip == nil {
 			failedRequestsCount.Inc()
 			return buildDeniedResponse(externalIP, "externalIP specified is not valid")
 		}
 
-		for _, externalIPNet := range sv.allowedExternalIPNets {
+		if _, found := sv.allowedIPs[externalIP]; found {
+			continue
+		}
+
+		var found bool
+		for _, externalIPNet := range sv.allowedIPNets {
 			if externalIPNet.Contains(ip) {
 				found = true
 				break
