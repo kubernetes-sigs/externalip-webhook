@@ -1,16 +1,56 @@
-# Kubernetes Template Project
+# clusterip-webhook
 
-The Kubernetes Template Project is a template for starting new projects in the GitHub organizations owned by Kubernetes. All Kubernetes projects, at minimum, must have the following files:
+created to address [CVE-2020-8554](https://www.cvedetails.com/cve/CVE-2020-8554/)
 
-- a `README.md` outlining the project goals, sponsoring sig, and community contact information
-- an `OWNERS` with the project leads listed as approvers ([docs on `OWNERS` files][owners])
-- a `CONTRIBUTING.md` outlining how to contribute to the project
-- an unmodified copy of `code-of-conduct.md` from this repo, which outlines community behavior and the consequences of breaking the code
-- a `LICENSE` which must be Apache 2.0 for code projects, or [Creative Commons 4.0] for documentation repositories, without any custom content
-- a `SECURITY_CONTACTS` with the contact points for the Product Security Team 
-  to reach out to for triaging and handling of incoming issues. They must agree to abide by the
-  [Embargo Policy](https://git.k8s.io/security/private-distributors-list.md#embargo-policy)
-  and will be removed and replaced if they violate that agreement.
+clusterip-webhook, is a validating webhook which prevents services from using random external IPs. Cluster administrators
+can specify list of CIDRs allowed to be used as external IP by specifying `allowed-external-ip-cidrs` parameter.
+Webhook will only allow creation of services which doesn't require external IP or whose external IPs are within the range
+specified by the administrator.
+
+## Build
+
+This repo is built using [kubebuilder](https://book.kubebuilder.io/).
+
+### Updating webhook namespace
+Webhook by default runs under `externalip-validation-system` ns. This can be changed by updating namespace and
+namePrefix in [kustomization.yaml](config/default/kustomization.yaml) file.
+
+### Certificate generation for webhook
+Webhook certificates can either be generated through cert-manager or by uploading certs. Following section explains how
+this can be achieved.
+
+#### Using cert manager
+Uncomment all sections with 'CERTMANAGER' in [kustomization.yaml](config/default/kustomization.yaml) file.
+
+#### Uploading webhook certificates
+1. Upload certs data (ca.crt, tls.crt and tls.key) as kubernetes secret with name `webhook-server-cert` in namespace
+same as [kustomization.yaml](config/default/kustomization.yaml).
+2. Update `caBundle` field in [manifests.yaml](config/webhook/manifests.yaml).
+
+### Enabling metrics endpoint
+Webhook emits `webhook_failed_request_count` metrics whenever it rejects service creation or update operation.
+
+#### Enabling without auth-proxy
+Uncomment `--metrics-addr` and the corresponding section in containers.Port in [webhook.yaml](config/webhook/webhook.yaml).
+
+#### Enabling /metrics with auth-proxy
+1. Uncomment all sections with 'METRICS_SERVER_RBAC' in [kustomization.yaml](config/default/kustomization.yaml) file.
+2. Create cluster role binding for the cluster role in [auth_proxy_client_clusterrole.yaml](config/metrics_server_rbac/auth_proxy_client_clusterrole.yaml).
+
+### Deploying webhook
+
+1. To restrict external IP to certain CIDRs, uncomment and update `allowed-external-ip-cidrs` in [webhook.yaml](config/webhook/webhook.yaml).
+
+2. Build and deploy webhook by executing the following,
+```console
+make docker-build IMG=DOCKER_IMAGE_TAG
+make deploy IMG=DOCKER_IMAGE_TAG
+```
+
+NOTE: If auth-proxy is enabled then update `allowed-external-ip-cidrs` in [metrics_server_auth_proxy.yaml](config/default/metrics_server_auth_proxy_patch.yaml).
+
+### Exporting metrics for Prometheus
+Follow the steps mentioned [here](https://book.kubebuilder.io/reference/metrics.html#exporting-metrics-for-prometheus) to export the webhook metrics.
 
 ## Community, discussion, contribution, and support
 
