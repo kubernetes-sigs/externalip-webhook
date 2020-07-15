@@ -50,10 +50,10 @@ func init() {
 }
 
 // NewServiceValidator validates the input list if any and returns ServiceValidator with list of valid external IPNets
-func NewServiceValidator(allowedExternalIPs []string) (*ServiceValidator, error) {
+func NewServiceValidator(allowedCIDRs []string) (*ServiceValidator, error) {
 	var externalIPNets []*net.IPNet
-	for _, externalIP := range allowedExternalIPs {
-		_, ipNet, err := net.ParseCIDR(externalIP)
+	for _, allowedCIDR := range allowedCIDRs {
+		_, ipNet, err := net.ParseCIDR(allowedCIDR)
 		if err != nil {
 			return nil, err
 		}

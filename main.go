@@ -44,13 +44,13 @@ func init() {
 }
 
 func main() {
-	var allowedExternalIPs []string
+	var allowedCIDRs []string
 	var metricsAddr string
 	var webhookPort int
 
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "Webhook port number")
 	flag.StringVar(&metricsAddr, "metrics-addr", "0", "The address the metric endpoint binds to.")
-	flag.StringSliceVar(&allowedExternalIPs, "allowed-external-ips", []string{}, "List of CIDR ranges allowed as External IPs in the service spec.")
+	flag.StringSliceVar(&allowedCIDRs, "allowed-external-ip-cidrs", []string{}, "List of CIDR ranges allowed as External IPs in the service spec.")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -66,7 +66,7 @@ func main() {
 	}
 
 	setupLog.Info("registering webhook...")
-	serviceValidator, err := validator.NewServiceValidator(allowedExternalIPs)
+	serviceValidator, err := validator.NewServiceValidator(allowedCIDRs)
 	if err != nil {
 		setupLog.Error(err, "problem registering webhook")
 		os.Exit(1)
