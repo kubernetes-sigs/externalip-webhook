@@ -1,8 +1,8 @@
-# clusterip-webhook
+# externalip-webhook
 
 created to address [CVE-2020-8554](https://www.cvedetails.com/cve/CVE-2020-8554/)
 
-clusterip-webhook, is a validating webhook which prevents services from using random external IPs. Cluster administrators
+externalip-webhook, is a validating webhook which prevents services from using random external IPs. Cluster administrators
 can specify list of CIDRs allowed to be used as external IP by specifying `allowed-external-ip-cidrs` parameter.
 Webhook will only allow creation of services which doesn't require external IP or whose external IPs are within the range
 specified by the administrator.
