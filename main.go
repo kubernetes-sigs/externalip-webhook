@@ -29,7 +29,7 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
-	"github.com/kubernetes-security/clusterip-webhook/pkg/validator"
+	"github.com/kubernetes-security/externalip-webhook/pkg/validator"
 )
 
 var (

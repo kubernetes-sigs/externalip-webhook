@@ -1,4 +1,4 @@
-module github.com/kubernetes-security/clusterip-webhook
+module github.com/kubernetes-security/externalip-webhook
 
 go 1.13
 
