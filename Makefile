@@ -1,6 +1,8 @@
 
 # Image URL to use all building/pushing image targets
 IMG ?= webhook:latest
+OS ?= linux
+ARCH ?= amd64
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -46,7 +48,7 @@ generate: controller-gen
 
 # Build the docker image
 docker-build: test
-	docker build . -t ${IMG}
+	docker build --build-arg GOOS="$(OS)" --build-arg GOARCH="$(ARCH)" . -t ${IMG}
 
 # Push the docker image
 docker-push:
