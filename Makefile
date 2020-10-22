@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= webhook:latest
+IMG ?= k8s.gcr.io/multitenancy/externalip-webhook:v1.0.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -24,7 +24,7 @@ run: generate fmt vet manifests
 	go run ./main.go
 
 # Deploy webhook in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests
+deploy:
 	cd config/webhook && kustomize edit set image webhook=${IMG}
 	kustomize build config/default | kubectl apply -f -
 

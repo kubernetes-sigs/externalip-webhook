@@ -7,9 +7,29 @@ can specify list of CIDRs allowed to be used as external IP by specifying `allow
 Webhook will only allow creation of services which doesn't require external IP or whose external IPs are within the range
 specified by the administrator.
 
-## Build
-
 This repo is built using [kubebuilder](https://book.kubebuilder.io/).
+
+## Deploying
+
+To restrict external IP to certain CIDRs, uncomment and update `allowed-external-ip-cidrs` in [webhook.yaml](config/webhook/webhook.yaml).
+
+NOTE: If auth-proxy is enabled then update `allowed-external-ip-cidrs` in [metrics_server_auth_proxy.yaml](config/default/metrics_server_auth_proxy_patch.yaml).
+
+#### Deploy pre-built webhook
+To deploy the webhook using the manifests in this repo, you must have `kustomize` in your path.
+You can download `kustomize` here: https://kubernetes-sigs.github.io/kustomize/installation/
+
+```console
+make deploy
+```
+
+#### Build and deploy webhook
+```console
+make docker-build IMG=DOCKER_IMAGE_TAG
+make deploy IMG=DOCKER_IMAGE_TAG
+```
+
+## Configuration
 
 ### Updating webhook namespace
 Webhook by default runs under `externalip-validation-system` ns. This can be changed by updating namespace and
@@ -36,23 +56,6 @@ Uncomment `--metrics-addr` and the corresponding section in containers.Port in [
 #### Enabling /metrics with auth-proxy
 1. Uncomment all sections with 'METRICS_SERVER_RBAC' in [kustomization.yaml](config/default/kustomization.yaml) file.
 2. Create cluster role binding for the cluster role in [auth_proxy_client_clusterrole.yaml](config/metrics_server_rbac/auth_proxy_client_clusterrole.yaml).
-
-### Deploying webhook
-
-To restrict external IP to certain CIDRs, uncomment and update `allowed-external-ip-cidrs` in [webhook.yaml](config/webhook/webhook.yaml).
-
-NOTE: If auth-proxy is enabled then update `allowed-external-ip-cidrs` in [metrics_server_auth_proxy.yaml](config/default/metrics_server_auth_proxy_patch.yaml).
-
-#### Build and deploy webhook
-```console
-make docker-build IMG=DOCKER_IMAGE_TAG
-make deploy IMG=DOCKER_IMAGE_TAG
-```
-
-#### Deploy pre-built webhook
-```console
-make deploy IMG=gcr.io/k8s-staging-multitenancy/externalip-webhook:v1.0.0
-```
 
 ### Exporting metrics for Prometheus
 Follow the steps mentioned [here](https://book.kubebuilder.io/reference/metrics.html#exporting-metrics-for-prometheus) to export the webhook metrics.
