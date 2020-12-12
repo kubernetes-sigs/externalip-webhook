@@ -25,7 +25,7 @@ make deploy
 
 #### Build and deploy webhook
 ```console
-make docker-build IMG=DOCKER_IMAGE_TAG
+make docker-build docker-push IMG=DOCKER_IMAGE_TAG
 make deploy IMG=DOCKER_IMAGE_TAG
 ```
 
