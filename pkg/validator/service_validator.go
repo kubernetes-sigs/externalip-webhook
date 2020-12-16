@@ -40,8 +40,9 @@ var (
 // +kubebuilder:webhook:path=/validate-service,mutating=false,failurePolicy=Ignore,groups="core",resources=services,verbs=create;update,versions=v1,name=validate-externalip.webhook.svc
 
 type ServiceValidator struct {
-	allowedExternalIPNets []*net.IPNet
-	decoder               *admission.Decoder
+	allowedExternalIPNets     []*net.IPNet
+	allowedLoadbalancerIPNets []*net.IPNet
+	decoder                   *admission.Decoder
 }
 
 func init() {
@@ -50,17 +51,26 @@ func init() {
 }
 
 // NewServiceValidator validates the input list if any and returns ServiceValidator with list of valid external IPNets
-func NewServiceValidator(allowedCIDRs []string) (*ServiceValidator, error) {
-	var externalIPNets []*net.IPNet
-	for _, allowedCIDR := range allowedCIDRs {
+func NewServiceValidator(allowedExternalIPCIDRs []string, allowedLoadbalancerIPCIDRs []string) (*ServiceValidator, error) {
+	sv := &ServiceValidator{}
+
+	for _, allowedCIDR := range allowedExternalIPCIDRs {
 		_, ipNet, err := net.ParseCIDR(allowedCIDR)
 		if err != nil {
 			return nil, err
 		}
-		externalIPNets = append(externalIPNets, ipNet)
+		sv.allowedExternalIPNets = append(sv.allowedExternalIPNets, ipNet)
 	}
 
-	return &ServiceValidator{allowedExternalIPNets: externalIPNets}, nil
+	for _, allowedCIDR := range allowedLoadbalancerIPCIDRs {
+		_, ipNet, err := net.ParseCIDR(allowedCIDR)
+		if err != nil {
+			return nil, err
+		}
+		sv.allowedLoadbalancerIPNets = append(sv.allowedLoadbalancerIPNets, ipNet)
+	}
+
+	return sv, nil
 }
 
 // Handle handles the /validate-service endpoint requests
@@ -72,7 +82,15 @@ func (sv *ServiceValidator) Handle(ctx context.Context, req admission.Request) a
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	return sv.validateExternalIPs(svc.Spec.ExternalIPs)
+	if response := sv.validateExternalIPs(svc.Spec.ExternalIPs); !response.Allowed {
+		return response
+	}
+
+	if response := sv.validateLoadBalancerIngresses(svc.Status.LoadBalancer.Ingress); !response.Allowed {
+		return response
+	}
+
+	return admission.Allowed("passed")
 }
 
 // InjectDecoder injects decoder into ServiceValidator
@@ -81,26 +99,51 @@ func (sv *ServiceValidator) InjectDecoder(d *admission.Decoder) error {
 	return nil
 }
 
+// isInCIDRRange returns true if ip is found in any of the CIDR blocks.
+func isInCIDRRange(cidrs []*net.IPNet, ip net.IP) bool {
+	for _, cidr := range cidrs {
+		if cidr.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 // validateExternalIPs validates if external IP specified in the service is allowed or not
 func (sv *ServiceValidator) validateExternalIPs(externalIPsInSpec []string) admission.Response {
-
 	for _, externalIP := range externalIPsInSpec {
-		var found bool
 		ip := net.ParseIP(externalIP)
 		if ip == nil {
 			failedRequestsCount.Inc()
 			return buildDeniedResponse(externalIP, "externalIP specified is not valid")
 		}
 
-		for _, externalIPNet := range sv.allowedExternalIPNets {
-			if externalIPNet.Contains(ip) {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !isInCIDRRange(sv.allowedExternalIPNets, ip) {
 			failedRequestsCount.Inc()
 			return buildDeniedResponse(externalIP, "externalIP specified is not allowed to use")
+		}
+	}
+
+	return admission.Allowed("passed svc spec validation")
+}
+
+// validateLoadBalancerIngresses validates if the status contains disallowed IPs
+func (sv *ServiceValidator) validateLoadBalancerIngresses(ingresses []corev1.LoadBalancerIngress) admission.Response {
+	for i := range ingresses {
+		ingress := &ingresses[i]
+		if ingress.IP == "" {
+			continue
+		}
+
+		ip := net.ParseIP(ingress.IP)
+		if ip == nil {
+			failedRequestsCount.Inc()
+			return buildDeniedResponse(ingress.IP, "ingress IP specified is not valid")
+		}
+
+		if !isInCIDRRange(sv.allowedLoadbalancerIPNets, ip) {
+			failedRequestsCount.Inc()
+			return buildDeniedResponse(ingress.IP, "loadBalancer ingress ip specified is not allowed to use")
 		}
 	}
 
