@@ -1,0 +1,17 @@
+---
+# See https://cloud.google.com/cloud-build/docs/build-config
+timeout: 1200s
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag=k8s.gcr.io/multitenancy/externalip-webhook:$_GIT_TAG
+      - --tag=k8s.gcr.io/multitenancy/externalip-webhook:latest
+      - .
+substitutions:
+  # _GIT_TAG will be filled with a git-based tag for the image, of the form
+  # vYYYYMMDD-hash, and can be used as a substitution
+  _GIT_TAG: '12345'
+images:
+  - 'k8s.gcr.io/multitenancy/externalip-webhook:$_GIT_TAG'
+  - 'k8s.gcr.io/multitenancy/externalip-webhook:latest'
