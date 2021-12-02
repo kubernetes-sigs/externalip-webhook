@@ -18,10 +18,12 @@ package validator
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -41,6 +43,8 @@ var (
 
 type ServiceValidator struct {
 	allowedExternalIPNets []*net.IPNet
+	allowedUsernames      map[string]bool
+	allowedGroups         map[string]bool
 	decoder               *admission.Decoder
 }
 
@@ -50,7 +54,7 @@ func init() {
 }
 
 // NewServiceValidator validates the input list if any and returns ServiceValidator with list of valid external IPNets
-func NewServiceValidator(allowedCIDRs []string) (*ServiceValidator, error) {
+func NewServiceValidator(allowedCIDRs, allowedUsernames, allowedGroups []string) (*ServiceValidator, error) {
 	var externalIPNets []*net.IPNet
 	for _, allowedCIDR := range allowedCIDRs {
 		_, ipNet, err := net.ParseCIDR(allowedCIDR)
@@ -60,7 +64,17 @@ func NewServiceValidator(allowedCIDRs []string) (*ServiceValidator, error) {
 		externalIPNets = append(externalIPNets, ipNet)
 	}
 
-	return &ServiceValidator{allowedExternalIPNets: externalIPNets}, nil
+	allowedUsernameMap := make(map[string]bool, len(allowedUsernames))
+	for _, allowedName := range allowedUsernames {
+		allowedUsernameMap[allowedName] = true
+	}
+
+	allowedGroupMap := make(map[string]bool, len(allowedGroups))
+	for _, allowedGroup := range allowedGroups {
+		allowedGroupMap[allowedGroup] = true
+	}
+
+	return &ServiceValidator{allowedExternalIPNets: externalIPNets, allowedUsernames: allowedUsernameMap, allowedGroups: allowedGroupMap}, nil
 }
 
 // Handle handles the /validate-service endpoint requests
@@ -70,6 +84,14 @@ func (sv *ServiceValidator) Handle(ctx context.Context, req admission.Request) a
 	err := sv.decoder.Decode(req, svc)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
+	}
+
+	if len(svc.Spec.ExternalIPs) > 0 && !sv.isValidUser(req.UserInfo) {
+		failedRequestsCount.Inc()
+		reason := fmt.Sprintf("user %s is not alllowed to specify externalIP", req.UserInfo.Username)
+		response := admission.Denied(reason)
+		response.AuditAnnotations = map[string]string{"error": reason}
+		return response
 	}
 
 	return sv.validateExternalIPs(svc.Spec.ExternalIPs)
@@ -105,6 +127,27 @@ func (sv *ServiceValidator) validateExternalIPs(externalIPsInSpec []string) admi
 	}
 
 	return admission.Allowed("passed svc spec validation")
+}
+
+func (sv *ServiceValidator) isValidUser(user authenticationv1.UserInfo) bool {
+	// If both allowedUsernames and allowedGroups are empty, anyone is allowed
+	if len(sv.allowedUsernames) == 0 && len(sv.allowedGroups) == 0 {
+		return true
+	}
+
+	// Check if the requested user's name is listed in allowed usernames
+	if _, ok := sv.allowedUsernames[user.Username]; ok {
+		return true
+	}
+
+	// Check if the requested user belongs to allowed groups
+	for _, group := range user.Groups {
+		if _, ok := sv.allowedGroups[group]; ok {
+			return true
+		}
+	}
+
+	return false
 }
 
 func buildDeniedResponse(externalIP string, reason string) admission.Response {
