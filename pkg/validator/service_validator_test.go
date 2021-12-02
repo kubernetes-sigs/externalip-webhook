@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -45,4 +46,52 @@ func TestValidateExternalIPForMultipleInvalidInput(t *testing.T) {
 	assert.False(t, actualOutput.Allowed)
 	assert.Equal(t, actualOutput.Result.Reason, v1.StatusReason("spec.externalIPs: Invalid value: "+
 		"\"11.0.0.1\": externalIP specified is not allowed to use"))
+}
+
+func TestIsValidUserEmptyAllowedBoth(t *testing.T) {
+	newServiceValidator, _ := NewServiceValidator([]string{"10.0.0.0/8"}, []string{}, []string{})
+	actualOutput := newServiceValidator.isValidUser(authenticationv1.UserInfo{Username: "user1", Groups: []string{"group1"}})
+	assert.True(t, actualOutput)
+}
+
+func TestIsValidUserEmptyAllowedUserNoMatch(t *testing.T) {
+	newServiceValidator, _ := NewServiceValidator([]string{"10.0.0.0/8"}, []string{}, []string{"group2"})
+	actualOutput := newServiceValidator.isValidUser(authenticationv1.UserInfo{Username: "user1", Groups: []string{"group1"}})
+	assert.False(t, actualOutput)
+}
+
+func TestIsValidUserEmptyAllowedUserGroupMatch(t *testing.T) {
+	newServiceValidator, _ := NewServiceValidator([]string{"10.0.0.0/8"}, []string{}, []string{"group1"})
+	actualOutput := newServiceValidator.isValidUser(authenticationv1.UserInfo{Username: "user1", Groups: []string{"group1"}})
+	assert.True(t, actualOutput)
+}
+
+func TestIsValidUserEmptyAllowedGroupNoMatch(t *testing.T) {
+	newServiceValidator, _ := NewServiceValidator([]string{"10.0.0.0/8"}, []string{"user2"}, []string{})
+	actualOutput := newServiceValidator.isValidUser(authenticationv1.UserInfo{Username: "user1", Groups: []string{"group1"}})
+	assert.False(t, actualOutput)
+}
+
+func TestIsValidUserEmptyAllowedGroupUserMatch(t *testing.T) {
+	newServiceValidator, _ := NewServiceValidator([]string{"10.0.0.0/8"}, []string{"user1"}, []string{})
+	actualOutput := newServiceValidator.isValidUser(authenticationv1.UserInfo{Username: "user1", Groups: []string{"group1"}})
+	assert.True(t, actualOutput)
+}
+
+func TestIsValidUserOnlyUsernameMatch(t *testing.T) {
+	newServiceValidator, _ := NewServiceValidator([]string{"10.0.0.0/8"}, []string{"user2", "user1"}, []string{"group2"})
+	actualOutput := newServiceValidator.isValidUser(authenticationv1.UserInfo{Username: "user1", Groups: []string{"group1"}})
+	assert.True(t, actualOutput)
+}
+
+func TestIsValidUserOnlyGroupMatch(t *testing.T) {
+	newServiceValidator, _ := NewServiceValidator([]string{"10.0.0.0/8"}, []string{"user2"}, []string{"group2", "group1"})
+	actualOutput := newServiceValidator.isValidUser(authenticationv1.UserInfo{Username: "user1", Groups: []string{"group1"}})
+	assert.True(t, actualOutput)
+}
+
+func TestIsValidUserNoMatch(t *testing.T) {
+	newServiceValidator, _ := NewServiceValidator([]string{"10.0.0.0/8"}, []string{"user2"}, []string{"group2"})
+	actualOutput := newServiceValidator.isValidUser(authenticationv1.UserInfo{Username: "user1", Groups: []string{"group1"}})
+	assert.False(t, actualOutput)
 }
