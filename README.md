@@ -6,12 +6,17 @@ externalip-webhook, is a validating webhook which prevents services from using r
 can specify list of CIDRs allowed to be used as external IP by specifying `allowed-external-ip-cidrs` parameter.
 Webhook will only allow creation of services which doesn't require external IP or whose external IPs are within the range
 specified by the administrator.
+externalip-webhook can also restrict who can specify allowed ranges of external IPs to services by specifying `allowed-usernames` and `allowed-groups` parameters.
 
 This repo is built using [kubebuilder](https://book.kubebuilder.io/).
 
 ## Deploying
 
 To restrict external IP to certain CIDRs, uncomment and update `allowed-external-ip-cidrs` in [webhook.yaml](config/webhook/webhook.yaml).
+
+To restrict users that can specify external IPs to services, uncomment and update `allowed-usernames` and/or `allowed-groups` in [webhook.yaml](config/webhook/webhook.yaml).
+Default values for both parameters are empty and it means any users can specify.
+If either of the parameters is set, specifying external IPs is restricted to the users that match to any of these parameters.
 
 NOTE: If auth-proxy is enabled then update `allowed-external-ip-cidrs` in [metrics_server_auth_proxy.yaml](config/default/metrics_server_auth_proxy_patch.yaml).
 
