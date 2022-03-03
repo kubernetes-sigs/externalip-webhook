@@ -237,7 +237,7 @@ func TestHandle(t *testing.T) {
 			serviceSpec:      serviceWithDeniedExternalIP,
 			userName:         "user1",
 			groups:           []string{"group1"},
-			ExpectAllowed:    true,
+			ExpectAllowed:    false,
 		},
 	}
 
