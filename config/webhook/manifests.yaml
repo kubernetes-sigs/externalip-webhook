@@ -6,17 +6,15 @@ metadata:
   creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
-- clientConfig:
-    caBundle: Cg==
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
       path: /validate-service
   failurePolicy: Fail
   name: validate-externalip.webhook.svc
-  sideEffects: None
-  admissionReviewVersions:
-  - v1beta1
   rules:
   - apiGroups:
     - ""
@@ -27,3 +25,4 @@ webhooks:
     - UPDATE
     resources:
     - services
+  sideEffects: None
