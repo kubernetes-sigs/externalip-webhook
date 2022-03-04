@@ -39,7 +39,7 @@ var (
 	)
 )
 
-// +kubebuilder:webhook:path=/validate-service,mutating=false,failurePolicy=Ignore,groups="core",resources=services,verbs=create;update,versions=v1,name=validate-externalip.webhook.svc
+// +kubebuilder:webhook:path=/validate-service,mutating=false,failurePolicy=Fail,groups="core",resources=services,verbs=create;update,versions=v1,name=validate-externalip.webhook.svc,sideEffects=None,admissionReviewVersions=v1beta1
 
 type ServiceValidator struct {
 	allowedExternalIPNets []*net.IPNet
