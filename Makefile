@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= k8s.gcr.io/multitenancy/externalip-webhook:v1.0.0
+IMG ?= registry.k8s.io/multitenancy/externalip-webhook:v1.0.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
